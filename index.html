@@ -1,18 +1,316 @@
-<!DOCTYPE html>
-<html lang="zh-cn">
-
+<!doctype html>
+<html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YanL｜Home</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>昔涟Cyrene</title>
+  <style>
+    :root{
+      --sakura-1: #fff1f5;
+      --sakura-2: #ffd6e7;
+      --sakura-3: #ffb3d1;
+      --accent: #ff8fb1;
+      --muted: #6b6b6b;
+      font-family: "Helvetica Neue", "PingFang SC", "Noto Sans SC", Arial, sans-serif;
+    }
+    html,body{height:100%;margin:0;background:
+      radial-gradient(1200px 600px at 10% 10%, rgba(255,220,235,0.14), transparent 10%),
+      linear-gradient(180deg, var(--sakura-1) 0%, var(--sakura-2) 60%, var(--sakura-3) 100%);
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+    }
+    .wrap{min-height:100%;display:flex;align-items:center;justify-content:center;padding:28px;box-sizing:border-box;}
+    .card{
+      width:100%;max-width:920px;padding:26px;border-radius:16px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,250,252,0.88));
+      box-shadow: 0 10px 40px rgba(200,90,120,0.06);
+      text-align:left;
+    }
+    h1{margin:0 0 6px;color:#8e1f4b;}
+    .subtitle{color:var(--muted);margin:0 0 16px;}
+    .controls{display:flex;gap:12px;align-items:center;margin-top:12px;}
+    .btn{
+      background:linear-gradient(180deg,var(--accent),#ec6a9a);
+      color:#fff;border:0;padding:10px 16px;border-radius:10px;font-weight:600;cursor:pointer;
+      box-shadow:0 8px 22px rgba(255,120,165,0.14);
+    }
+    .btn:active{transform:translateY(1px);}
+    .note{margin-top:14px;color:#7a4050;font-size:13px;}
+
+    /* timer popup — 固定在页面正中，最底层（z-index 100） */
+    .timer-popup{
+      position:fixed;
+      left:50%;
+      top:50%;
+      transform:translate(-50%,-50%);
+      z-index:100; /* 最底层弹窗（低于 overlay 和 blessing）*/
+      background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,245,249,0.95));
+      padding:14px 20px;
+      border-radius:12px;
+      box-shadow: 0 10px 30px rgba(185,77,118,0.06);
+      color:#9b2350;
+      font-weight:700;
+      text-align:center;
+      min-width:260px;
+      pointer-events:none;
+    }
+    .timer-sub{font-size:12px;color:var(--muted);font-weight:500;margin-top:6px;}
+
+    /* initial overlay modal (简洁提示 + 一个按钮) */
+    .overlay{
+      position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+      background: linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,240,246,0.28));
+      z-index:1000;
+    }
+    .modal{
+      width:88%;max-width:560px;background:white;border-radius:12px;padding:18px;
+      box-shadow: 0 20px 60px rgba(170,50,100,0.12);text-align:center;
+    }
+    .modal p{margin:0;color:#7a4050;font-size:16px;padding:4px 0 12px;}
+
+    /* blessing popups — 随机位置、可同时存在（可覆盖） */
+    .blessing-container{position:fixed;inset:0;pointer-events:none;z-index:2000;}
+    .blessing{
+      position:fixed;
+      pointer-events:auto;
+      background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255,245,249,0.98));
+      padding:10px 14px;border-radius:10px;color:#6f1637;font-weight:600;
+      box-shadow: 0 10px 30px rgba(185,77,118,0.14);border:1px solid rgba(255,140,170,0.12);
+      opacity:0; transform-origin:center center; transition: transform 260ms cubic-bezier(.2,.9,.2,1), opacity 260ms;
+      max-width:320px; word-break:break-word;
+      left:0; top:0;
+      will-change: transform, opacity, left, top;
+    }
+    .blessing.show{opacity:1; transform: translateY(0) scale(1);}
+    .blessing.hide{opacity:0; transform: translateY(-10px) scale(.98);}
+
+    @media (max-width:520px){
+      .modal{padding:12px;}
+      .timer-popup{min-width:200px;padding:10px 12px;}
+      .blessing{max-width:260px;padding:8px 12px;}
+    }
+  </style>
 </head>
 <body>
+  <!-- timer popup（固定在页面正中，最底层弹窗） -->
+  <div class="timer-popup" id="timerPopup" role="status" aria-live="polite" title="从指定时间开始的正计时">
+    <div id="timerMain">载入中...</div>
+    <div class="timer-sub">昔涟已离开</div>
+  </div>
 
-<h1>这里是YanL的个人主页</h1>
-<h5>Welcome to YanL's personal homepage<h5>
-<hr/>
-<p> 你好！</p>
+  <!-- overlay modal（简洁提示：一行语句 + 一个按钮“接下祝福”） -->
+  <div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal" id="modal">
+      <p id="modalTitle">别眨眼哦，有惊喜♪</p>
+      <div style="margin-top:12px;">
+        <button class="btn" id="acceptBtn">接</button>
+      </div>
+    </div>
+  </div>
 
+  <!-- blessing popups container -->
+  <div class="blessing-container" id="blessingContainer" aria-hidden="true"></div>
+
+  <script>
+    /* ========= 配置（在代码里修改祝福内容与参数） =========
+       - 修改祝福内容请编辑下面的 `BLESSINGS` 数组
+       - 计时起点：START_TIME_STR （本地时区解释）
+       - 弹窗间隔与显示时长：
+           INTERVAL_MS = 200  // 每 0.2 秒生成一条
+           POPUP_DISPLAY_MS = 5000 // 每条显示 5 秒
+       - 首条弹窗将在确认后等待 FIRST_DELAY_MS（2000ms）再出现
+    */
+    const START_TIME_STR = "2025-11-05T11:00:00"; // 本地时区
+    const INTERVAL_MS = 50;      // 每条弹窗之间的间隔（毫秒）
+    const POPUP_DISPLAY_MS = 5000; // 每条弹窗显示时长（毫秒）
+    const FIRST_DELAY_MS = 1000;  // 确认后首条弹窗延迟（毫秒）
+
+    // 在此处编辑或扩展祝福文本（后台代码位置）
+    const BLESSINGS = [
+      "一如初见♪",
+      "一定会再见的，对吧♪",
+      "始终如一♪",
+      "以爱为始，以爱为终♪",
+      "明天，一同写下！",
+      "愿开拓之旅，永远有涟漪相伴♪",
+      "我们，无所不能!",
+      "准备好唤醒涟漪了吗？",
+      "群星啊，请为英雄闪耀！",
+      "百花啊，请为明天绽放！",
+      "让刹那，成为永恒~",
+      "我会哭的~",
+      "明天见！",
+      "无论过去多久，我都会等你♪",
+      "愿世界如你我所愿~",
+      "愿「浪漫」永不离席",
+      "愿「门径」再无别离",
+      "愿「纷争」加冕成王",
+      "愿「天空」治愈晨昏",
+      "愿「轨迹」皆为游戏",
+      "愿「海洋」奏响欢宴",
+      "愿「律法」遍入群星",
+      "愿「岁月」守望长夜",
+      "愿「大地」捍卫前路",
+      "愿「生死」萌发新芽",
+      "愿「理性」启蒙真理",
+      "愿「负世」照拂黎明",
+      "愿「开拓」共赴「爱」的约定♪",
+      "翻开吧，永恒的一页",
+      "每一段回忆，都化作涟漪",
+      "嗨，好久不见！",
+      "这一定是个不同以往的浪漫故事♪",
+      "一起写下不同以往的诗篇吧♪",
+      "可爱的少女，可是无所不能的哦♪",
+    ];
+    /* ============================================ */
+
+    // DOM
+    const overlay = document.getElementById('overlay');
+    const acceptBtn = document.getElementById('acceptBtn');
+    const openModalBtn = document.getElementById('openModalBtn');
+    const blessingContainer = document.getElementById('blessingContainer');
+    const timerMain = document.getElementById('timerMain');
+
+    // 计时器逻辑（正计时，自 START_TIME_STR 起）
+    const startDate = new Date(START_TIME_STR);
+    function pad(n, l=2){ return String(n).padStart(l,'0'); }
+    function updateTimer(){
+      const now = new Date();
+      let diff = now - startDate;
+      if (diff < 0){
+        diff = -diff;
+        const days = Math.floor(diff / 86400000);
+        const hours = Math.floor((diff % 86400000) / 3600000);
+        const minutes = Math.floor((diff % 3600000) / 60000);
+        const seconds = Math.floor((diff % 60000) / 1000);
+        timerMain.textContent = `尚未开始 - ${pad(days)}天 ${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+      } else {
+        const days = Math.floor(diff / 86400000);
+        const hours = Math.floor((diff % 86400000) / 3600000);
+        const minutes = Math.floor((diff % 3600000) / 60000);
+        const seconds = Math.floor((diff % 60000) / 1000);
+        timerMain.textContent = `${days} 天 ${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+      }
+    }
+    updateTimer();
+    setInterval(updateTimer, 1000);
+
+    // 随机位置计算（保证在视窗内并有边距）
+    function randomPosition(elemWidth=260, elemHeight=80){
+      const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+      const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
+      const marginX = Math.max(12, Math.floor(vw * 0.06));
+      const marginY = Math.max(12, Math.floor(vh * 0.06));
+      const usableWidth = Math.max(0, vw - marginX * 2 - elemWidth);
+      const usableHeight = Math.max(0, vh - marginY * 2 - elemHeight);
+      const left = marginX + Math.floor(Math.random() * (usableWidth + 1));
+      const top = marginY + Math.floor(Math.random() * (usableHeight + 1));
+      return {left, top};
+    }
+
+    // 防XSS 简单转义
+    function escapeHtml(str){
+      return String(str).replace(/[&<>"']/g, (m) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));
+    }
+
+    // 创建并显示单个祝福弹窗（随机位置、没有计数后缀）
+    function showBlessing(text){
+      // Create element and insert into DOM hidden for measurement
+      const el = document.createElement('div');
+      el.className = 'blessing hide';
+      el.setAttribute('role','status');
+      el.setAttribute('aria-live','polite');
+      el.style.maxWidth = '320px';
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(-6px) scale(.98)';
+      el.innerHTML = `<div class="msg">${escapeHtml(text)}</div>`;
+      blessingContainer.appendChild(el);
+
+      // Ensure the element is rendered before measuring
+      requestAnimationFrame(() => {
+        const rect = el.getBoundingClientRect();
+        const w = Math.min(rect.width || 260, 320);
+        const h = Math.min(rect.height || 80, 200);
+        const pos = randomPosition(w, h);
+        // set position
+        el.style.left = pos.left + 'px';
+        el.style.top = pos.top + 'px';
+
+        // force reflow and play show animation
+        void el.offsetWidth;
+        el.classList.remove('hide');
+        el.classList.add('show');
+        el.style.opacity = ''; // let CSS transition handle it
+        el.style.transform = '';
+
+        // 自动隐藏并移除（不会阻止其他弹窗）
+        setTimeout(() => {
+          el.classList.remove('show');
+          el.classList.add('hide');
+          setTimeout(() => {
+            try{ blessingContainer.removeChild(el); } catch(e){}
+          }, 300);
+        }, POPUP_DISPLAY_MS);
+      });
+    }
+
+    // 启动/停止持续弹出（无限）—— 使用 setInterval 持续生成
+    let popupIntervalId = null;
+    let popupStartTimeoutId = null;
+
+    function startContinuousPopups(initialDelay = FIRST_DELAY_MS){
+      // 如果已经在运行，先重置（停止再启动），确保每次确认行为一致（首条延迟）
+      stopContinuousPopups();
+
+      const pool = Array.isArray(BLESSINGS) && BLESSINGS.length ? BLESSINGS.slice() : ["愿你万事如意！"];
+      if (!pool.length) return;
+
+      // 首条在 initialDelay 后显示，然后启动定时器（间隔从那之后开始）
+      popupStartTimeoutId = setTimeout(() => {
+        // 首次出现
+        const firstPick = pool[Math.floor(Math.random() * pool.length)];
+        showBlessing(firstPick);
+
+        // 随后以 INTERVAL_MS 频率持续弹出
+        popupIntervalId = setInterval(() => {
+          const pick = pool[Math.floor(Math.random() * pool.length)];
+          showBlessing(pick);
+        }, INTERVAL_MS);
+      }, initialDelay);
+    }
+
+    function stopContinuousPopups(){
+      if (popupIntervalId !== null){
+        clearInterval(popupIntervalId);
+        popupIntervalId = null;
+      }
+      if (popupStartTimeoutId !== null){
+        clearTimeout(popupStartTimeoutId);
+        popupStartTimeoutId = null;
+      }
+    }
+
+    // 事件：初始模态按钮（用于关闭提示并开始弹出）
+    acceptBtn.addEventListener('click', () => {
+      overlay.style.display = 'none';
+      // start with 2s delay for first popup
+      startContinuousPopups(FIRST_DELAY_MS);
+    });
+
+    // 打开提示按钮（只是展示提示，不会触发弹窗）
+    openModalBtn.addEventListener('click', () => { overlay.style.display = 'flex'; });
+
+    // 按 Esc 关闭模态
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && overlay.style.display !== 'none') overlay.style.display = 'none';
+    });
+
+    // 确保页面加载时不自动弹出 —— 仅显示提示模态（不启动弹窗）
+    overlay.style.display = 'flex';
+
+    // 页面卸载时清理定时器
+    window.addEventListener('beforeunload', () => {
+      stopContinuousPopups();
+    });
+  </script>
 </body>
 </html>
